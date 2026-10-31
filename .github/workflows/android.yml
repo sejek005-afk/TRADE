@@ -49,9 +49,17 @@ jobs:
           files: out/*.apk
           make_latest: true
 
-      - name: Upload build log on failure
+      - name: Report build errors on failure
         if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: android-build-log
-          path: build.log
+        run: |
+          grep -E "^e: |error:|What went wrong|Execution failed|> " build.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line//%/%25}"
+          done
+          git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
+          cp build.log /tmp/build.log
+          git checkout --orphan ci-logs
+          git rm -rf --cached . >/dev/null
+          cp /tmp/build.log build.log
+          git add -f build.log
+          git commit -m "android build log ${{ github.run_number }}"
+          git push -f origin ci-logs
