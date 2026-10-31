@@ -37,7 +37,13 @@ def main() -> int:
     restarts = []
     while True:
         log.info("starting engine")
-        proc = subprocess.Popen([sys.executable, "-m", "ntpro.main"], cwd=str(Path(__file__).resolve().parent.parent),
+        exe = sys.executable
+        if exe.lower().endswith("pythonw.exe"):          # موتور با python.exe و بدون پنجره اجرا می‌شود تا خروجی‌اش لاگ شود
+            exe = exe[:-len("pythonw.exe")] + "python.exe"
+        console = open(data / "logs" / "engine_console.log", "a", encoding="utf-8")
+        proc = subprocess.Popen([exe, "-m", "ntpro.main"], cwd=str(Path(__file__).resolve().parent.parent),
+                                stdout=console, stderr=subprocess.STDOUT,
+                                env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         started = time.time()
         while proc.poll() is None:

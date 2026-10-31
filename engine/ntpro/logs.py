@@ -40,5 +40,6 @@ def setup(data_dir: Path, level: int = logging.INFO) -> None:
     sh.setFormatter(fmt)
     root = logging.getLogger()
     root.setLevel(level)
-    for h in (fh, RING, sh):
+    import sys
+    for h in (fh, RING) + ((sh,) if sys.stderr is not None else ()):
         root.addHandler(h)
