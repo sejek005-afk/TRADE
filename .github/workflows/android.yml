@@ -1,0 +1,57 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/app-release.apk out/NeuroTraderPro-v1.0.${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: NeuroTraderPro-apk
+          path: out/*.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v1.0.${{ github.run_number }}
+          name: NeuroTrader Pro — اپ اندروید v1.0.${{ github.run_number }}
+          body: |
+            فایل APK نوروترید پرو. روی گوشی دانلود و نصب کنید (اجازه‌ی نصب از منابع ناشناس را بدهید).
+            این اپ فقط پنل کنترل است؛ موتور روی VPS ویندوزی اجرا می‌شود (راهنما در README).
+            شناسه‌ی اپ com.neurotrader.pro است و کنار اپ قبلی نصب می‌شود (جایگزینش نمی‌شود).
+          files: out/*.apk
+          make_latest: true
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: android-build-log
+          path: build.log

@@ -1,0 +1,18 @@
+MetaTrader5>=5.0.45; platform_system == "Windows"
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+scikit-learn>=1.3
+lightgbm>=4.1
+fastapi>=0.110
+uvicorn[standard]>=0.29
+cryptography>=42
+tzdata>=2024.1
+pywin32>=306; platform_system == "Windows"
+psutil>=5.9
+pytest>=8
+httpx>=0.27
+# اختیاری (شبکه‌ی عصبی TCN با PyTorch؛ بدون آن MLP سبک numpy استفاده می‌شود):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# اختیاری (FinBERT برای تحلیل احساسات اخبار):
+#   pip install transformers

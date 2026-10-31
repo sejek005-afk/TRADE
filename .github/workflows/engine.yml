@@ -1,0 +1,56 @@
+name: Engine tests
+
+on:
+  push:
+    branches: [main]
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # ویندوز، همان سیستم‌عاملی که VPS دارد
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: engine/requirements.txt
+      - name: Install
+        working-directory: engine
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          Get-Content requirements.txt | Where-Object { $_ -notmatch 'MetaTrader5' } | Set-Content req-ci.txt
+          pip install -r req-ci.txt
+      - name: Check MetaTrader5 package installs
+        continue-on-error: true
+        run: pip install MetaTrader5
+      - name: Test
+        working-directory: engine
+        run: python -m pytest -q tests
+
+  package:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Zip engine
+        run: |
+          cd engine && zip -r ../NeuroTraderPro-engine.zip . -x "data/*" -x "*/__pycache__/*" -x ".venv/*"
+          cd .. && echo "data/ will be created on first run" > /dev/null
+      - name: Publish engine package
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: engine-v1.0.${{ github.run_number }}
+          name: NeuroTrader Pro — موتور v1.0.${{ github.run_number }}
+          body: |
+            بسته‌ی موتور برای VPS ویندوزی. محتویات را در C:\NeuroTraderPro\engine باز کنید و طبق README نصب کنید.
+            پورت 8810، Magic 31102026، تسک ویندوز NeuroTraderPro — جدا از برنامه‌ی دیگر روی سرور.
+          files: NeuroTraderPro-engine.zip
+          make_latest: false
