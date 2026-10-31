@@ -62,16 +62,18 @@ class Api(private val store: Store) {
             }
         }
 
-    suspend fun refresh(): Boolean = refreshLock.withLock {
-        if (store.refreshToken.isEmpty()) return false
-        return withContext(Dispatchers.IO) {
-            try {
-                val r = raw("POST", "/api/auth/refresh", JSONObject().put("refresh_token", store.refreshToken), false) as JSONObject
-                saveTokens(r)
-                true
-            } catch (e: Exception) {
-                if (e is ApiException && e.code == 401) store.clearSession()
-                false
+    suspend fun refresh(): Boolean {
+        refreshLock.withLock {
+            if (store.refreshToken.isEmpty()) return false
+            return withContext(Dispatchers.IO) {
+                try {
+                    val r = raw("POST", "/api/auth/refresh", JSONObject().put("refresh_token", store.refreshToken), false) as JSONObject
+                    saveTokens(r)
+                    true
+                } catch (e: Exception) {
+                    if (e is ApiException && e.code == 401) store.clearSession()
+                    false
+                }
             }
         }
     }
