@@ -143,7 +143,7 @@ class RiskManager:
     def pre_trade(self, *, symbol: str, direction: int, entry: float, sl: float, tp: float | None,
                   spec: SymbolSpec, balance: float, equity: float, spread_points: float,
                   open_trades: list[dict], today_closed: list[dict], recent_closed: list[dict],
-                  kill_switch: dict | None) -> RiskCheck:
+                  kill_switch: dict | None, foreign_positions: list[dict] | None = None) -> RiskCheck:
         r = self.r
         if kill_switch and kill_switch.get("active"):
             return RiskCheck(False, f"Kill Switch فعال است: {kill_switch.get('reason', '')}")
@@ -167,12 +167,13 @@ class RiskManager:
         # کنترل همبستگی/هم‌جهتی ارزها
         limit = int(r["max_same_currency_exposure"])
         load: dict[str, int] = {}
-        for t in open_trades:
+        for t in list(open_trades) + list(foreign_positions or []):
             for cur, d in exposures(t["symbol"], int(t["direction"])).items():
                 load[cur] = load.get(cur, 0) + d
         for cur, d in exposures(symbol, direction).items():
             if abs(load.get(cur, 0) + d) > limit and abs(load.get(cur, 0) + d) > abs(load.get(cur, 0)):
-                return RiskCheck(False, f"همبستگی: پوزیشن هم‌جهت روی {cur} از قبل باز است")
+                return RiskCheck(False, f"همبستگی: پوزیشن هم‌جهت روی {cur} از قبل باز است"
+                                        + (" (شامل پوزیشن‌های برنامه‌ی دیگر)" if foreign_positions else ""))
 
         volume = self.position_size(spec, balance, entry, sl, risk_pct)
         if volume < spec.volume_min:

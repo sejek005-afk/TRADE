@@ -31,7 +31,11 @@ def test_api_auth_and_endpoints(tmp_path):
     assert c.put("/api/config", json={"patch": {"api": {"port": 1}}}, headers=h).status_code == 400
     assert c.put("/api/config", json={"patch": {"risk": {"risk_per_trade_pct": 9}}}, headers=h).status_code == 400
     assert c.get("/api/config/versions", headers=h).json()
-    assert c.post("/api/mt5/credentials", json={"login": 1, "password": "pw", "server": "s"}, headers=h).json()["ok"]
+    assert c.post("/api/mt5/credentials", json={"login": 1, "shared": True}, headers=h).json()["ok"]
+    assert eng.cfg.get("mt5", "shared_terminal") is True
+    assert c.post("/api/mt5/credentials", json={"login": 1, "shared": False}, headers=h).status_code == 400
+    assert c.post("/api/mt5/credentials", json={"login": 1, "password": "pw", "server": "s", "shared": False},
+                  headers=h).json()["ok"]
     assert eng.vault.load_secret("mt5") == "pw"
     assert "pw" not in str(c.get("/api/config", headers=h).json())
     for ep in ("/api/learning", "/api/news", "/api/calendar", "/api/health", "/api/journal", "/api/logs",

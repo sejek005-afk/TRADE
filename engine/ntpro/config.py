@@ -23,10 +23,14 @@ DEFAULTS: dict[str, Any] = {
     "symbol_map": {},               # اگر نام نماد نزد بروکر فرق دارد: {"XAUUSD": "XAUUSD.ecn"}
     "timeframes": {"entry": "M5", "filters": ["M15", "H1"]},
     "mt5": {
-        "path": r"C:\NeuroTraderPro\MT5\terminal64.exe",   # نصب جداگانه‌ی MT5؛ به ترمینال برنامه‌ی دیگر وصل نمی‌شود
+        # shared_terminal=True: به همان متاتریدری که برنامه‌ی دیگر استفاده می‌کند وصل می‌شود، بدون ورود مجدد و بدون
+        # عوض کردن حساب. فقط با Magic خودش معامله می‌کند و به پوزیشن‌های برنامه‌ی دیگر دست نمی‌زند.
+        # False: نصب جداگانه‌ی MT5 (مسیر path) با ورود به حساب خودش.
+        "shared_terminal": True,
+        "path": "",                 # خالی = همان ترمینالی که روی سرور باز است
         "server": "LiteFinance-MT5-Demo",
-        "login": 0,
-        "portable": True,
+        "login": 0,                 # در حالت مشترک فقط برای کنترل: اگر حساب ترمینال فرق داشت، معامله نمی‌کند
+        "portable": False,
         "deviation_points": 20,
     },
     "api": {
@@ -60,6 +64,7 @@ DEFAULTS: dict[str, Any] = {
         "max_trades_per_day": 6,
         "max_open_positions": 3,
         "max_same_currency_exposure": 1,   # مثلاً هم‌زمان بیش از یک پوزیشن «خرید دلار» نه
+        "count_foreign_exposure": True,    # پوزیشن‌های برنامه‌ی دیگر روی همان حساب هم در کنترل همبستگی حساب شوند (فقط خواندنی)
         "max_drawdown_pct": 8.0,           # Kill Switch خودکار
         "commission_per_lot_usd": 7.0,     # کمیسیون رفت‌وبرگشت حساب ECN (قابل تنظیم)
     },

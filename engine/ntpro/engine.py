@@ -214,7 +214,7 @@ class Engine:
         self.account_info = a
         now = int(time.time())
         self.db.execute("INSERT OR REPLACE INTO equity(time,balance,equity) VALUES(?,?,?)", (now, a["balance"], a["equity"]))
-        dd, killed = self.risk.update_drawdown(float(a["equity"]))
+        dd, killed = self.risk.update_drawdown(self._own_equity(a))
         self.account_info["drawdown_pct"] = round(dd, 2)
         guard.check_brake(self.db, self.cfg, self.bandit, self.registry, dd)
         try:
@@ -227,6 +227,26 @@ class Engine:
         self.db.execute("INSERT OR REPLACE INTO health(time,ping_ms,mt5,feed_age,news_age) VALUES(?,?,?,?,?)",
                         (now, self.health["ping_ms"], int(self.health["mt5"]), self._feed_age(),
                          time.time() - self.feed.last_ok if self.feed.last_ok else None))
+
+    def _own_equity(self, a: dict) -> float:
+        """در حالت ترمینال مشترک، Drawdown فقط از معاملات خود این موتور حساب می‌شود
+        (سود/ضرر برنامه‌ی دیگر روی همان حساب، Kill Switch این موتور را فعال نمی‌کند)."""
+        if not self.cfg.get("mt5", "shared_terminal") or self.broker.name != "mt5":
+            return float(a["equity"])
+        base = self.db.kv_get("own_equity_base")
+        if base is None:
+            base = float(a["balance"])
+            self.db.kv_set("own_equity_base", base)
+        mode = self.cfg.get("mode")
+        realized = (self.db.one("SELECT COALESCE(SUM(pnl),0) s FROM trades WHERE status='closed' AND mode=?", (mode,)) or {}).get("s") or 0
+        floating = 0.0
+        try:
+            floating = sum(p.profit for p in self.broker.positions())
+        except Exception:
+            pass
+        own = float(base) + float(realized) + floating
+        self.account_info["own_equity"] = round(own, 2)
+        return own
 
     def _feed_age(self) -> float | None:
         ts = [v for v in self.health["last_tick"].values() if v]
@@ -312,7 +332,15 @@ class Engine:
                             self.db.query("SELECT * FROM trades WHERE status IN ('open','pending') AND mode=?", (mode,)),
                             self.db.query("SELECT * FROM trades WHERE status='closed' AND mode=? AND exit_time>=?", (mode, day)),
                             self.db.query("SELECT * FROM trades WHERE status='closed' AND mode=? ORDER BY exit_time DESC LIMIT 5", (mode,)),
-                            self.db.kv_get("kill_switch"))
+                            self.db.kv_get("kill_switch"), self._foreign())
+
+    def _foreign(self) -> list[dict]:
+        if not self.cfg.get("risk", "count_foreign_exposure"):
+            return []
+        try:
+            return self.broker.foreign_positions()
+        except Exception:
+            return []
 
     def _log_signal(self, ev, f) -> None:
         d = ev.decision

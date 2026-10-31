@@ -95,3 +95,14 @@ def test_exits_partial_be_trail_timestop():
     assert any(a.kind == "close" for a in stale)
     tp1, tp = plan_tp(1.1, 1.098, 1, [], ex, 1.5, 0.0001)
     assert tp1 == pytest.approx(1.102) and (tp - 1.1) >= 1.5 * 0.0021
+
+
+def test_foreign_positions_count_in_correlation(rm):
+    spec = default_spec("XAUUSD")
+    r = rm.pre_trade(**base_kwargs(spec, symbol="XAUUSD", entry=2000, sl=1995, tp=2015,
+                                   foreign_positions=[{"symbol": "EURUSD", "direction": 1}]))
+    assert not r.ok and "برنامه‌ی دیگر" in r.reason
+    # پوزیشن‌های برنامه‌ی دیگر شمرده می‌شوند ولی «گرید» حساب نمی‌شوند (روی همان نماد هم مجاز است)
+    r2 = rm.pre_trade(**base_kwargs(spec, symbol="XAUUSD", entry=2000, sl=1995, tp=2015,
+                                    foreign_positions=[{"symbol": "XAUUSD", "direction": -1}]))
+    assert "گرید" not in r2.reason

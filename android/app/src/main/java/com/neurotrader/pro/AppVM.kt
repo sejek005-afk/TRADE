@@ -249,9 +249,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         load("config", "/api/config")
     }
 
-    fun sendMt5(login: String, password: String, server: String, path: String) = launchBusy {
-        api.post("/api/mt5/credentials", JSONObject().put("login", login.toLong()).put("password", password)
-            .put("server", server).put("path", path))
-        message = "اطلاعات حساب رمزنگاری‌شده روی سرور ذخیره شد؛ اتصال دوباره برقرار می‌شود"
+    fun sendMt5(login: String, password: String, server: String, path: String, shared: Boolean) = launchBusy {
+        api.post("/api/mt5/credentials", JSONObject().put("login", login.toLongOrNull() ?: 0L).put("password", password)
+            .put("server", server).put("path", path).put("shared", shared))
+        message = if (shared) "ذخیره شد؛ موتور به همان متاتریدرِ باز روی سرور وصل می‌شود"
+        else "اطلاعات حساب رمزنگاری‌شده روی سرور ذخیره شد؛ اتصال دوباره برقرار می‌شود"
     }
 }

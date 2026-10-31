@@ -28,6 +28,7 @@ class AccountState:
     today_closed: list[dict] = field(default_factory=list)
     recent_closed: list[dict] = field(default_factory=list)
     kill_switch: dict | None = None
+    foreign_positions: list[dict] = field(default_factory=list)   # پوزیشن‌های برنامه‌ی دیگر (فقط خواندنی)
 
 
 @dataclass
@@ -183,7 +184,8 @@ class Pipeline:
         chk = self.risk.pre_trade(symbol=symbol, direction=d.direction, entry=entry, sl=sl, tp=tp, spec=spec,
                                   balance=account.balance, equity=account.equity, spread_points=spread_points,
                                   open_trades=account.open_trades, today_closed=account.today_closed,
-                                  recent_closed=account.recent_closed, kill_switch=account.kill_switch)
+                                  recent_closed=account.recent_closed, kill_switch=account.kill_switch,
+                                  foreign_positions=account.foreign_positions)
         ev.plan = Plan(d.direction, entry, sl, tp1, tp, chk.volume, chk)
         if not chk.ok:
             d.accepted, d.reject_reason = False, chk.reason

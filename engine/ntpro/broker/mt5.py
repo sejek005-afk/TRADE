@@ -1,8 +1,10 @@
 """اتصال به متاتریدر ۵ با پکیج MetaTrader5.
 
-نکات جداسازی از برنامه‌ی دیگر روی سرور:
-- به ترمینال جداگانه (mt5.path در تنظیمات، نصب portable در C:\\NeuroTraderPro\\MT5) وصل می‌شود، نه ترمینال برنامه‌ی دیگر.
-- فقط پوزیشن‌ها/سفارش‌هایی را می‌بیند و تغییر می‌دهد که Magic = ntpro.MAGIC دارند.
+نکات هم‌زیستی با برنامه‌ی دیگر روی سرور:
+- حالت پیش‌فرض (shared_terminal): به همان ترمینالی وصل می‌شود که باز است، بدون ورود مجدد و بدون تغییر حساب.
+  اگر حساب ترمینال با login تنظیم‌شده فرق داشته باشد، فقط قطع می‌شود (ترمینال و برنامه‌ی دیگر دست نمی‌خورند).
+- حالت جدا: ترمینال مستقل (mt5.path) با ورود به حساب خودش.
+- فقط پوزیشن‌ها/سفارش‌هایی را تغییر می‌دهد که Magic = ntpro.MAGIC دارند؛ پوزیشن‌های دیگر فقط خوانده می‌شوند.
 - زمان سرور بروکر به UTC تبدیل می‌شود (اختلاف خودکار محاسبه می‌شود).
 """
 from __future__ import annotations
@@ -50,12 +52,16 @@ class MT5Broker(Broker):
                 return False
             self.mt5 = mt5
             c = self.cfg.get("mt5")
-            pwd = self.password_provider()
-            kwargs = {"timeout": 60000, "portable": bool(c.get("portable", True))}
+            shared = bool(c.get("shared_terminal", True))
+            kwargs = {"timeout": 60000}
             if c.get("path"):
                 kwargs["path"] = c["path"]
-            if c.get("login") and pwd:
-                kwargs.update(login=int(c["login"]), password=pwd, server=c.get("server", ""))
+            if not shared:
+                kwargs["portable"] = bool(c.get("portable", False))
+                pwd = self.password_provider()
+                if c.get("login") and pwd:
+                    kwargs.update(login=int(c["login"]), password=pwd, server=c.get("server", ""))
+            # در حالت مشترک هیچ‌وقت login/password فرستاده نمی‌شود تا حساب ترمینال عوض نشود
             ok = mt5.initialize(**kwargs)
             if not ok:
                 self.last_error = f"initialize failed: {mt5.last_error()}"
@@ -66,9 +72,10 @@ class MT5Broker(Broker):
                 self.last_error = "اطلاعات حساب در دسترس نیست (ورود ناموفق؟)"
                 return False
             if c.get("login") and int(acc.login) != int(c["login"]):
-                self.last_error = f"ترمینال به حساب دیگری ({acc.login}) وصل است"
+                self.last_error = (f"ترمینال به حساب {acc.login} وصل است، نه {c['login']}. "
+                                   "موتور معامله نمی‌کند و به ترمینال دست نمی‌زند.")
                 log.error(self.last_error)
-                mt5.shutdown()
+                mt5.shutdown()      # فقط اتصال همین فرایند قطع می‌شود؛ ترمینال باز می‌ماند
                 return False
             for s in self.cfg.get("symbols"):
                 mt5.symbol_select(self.broker_symbol(s), True)
@@ -173,6 +180,11 @@ class MT5Broker(Broker):
             out.append(Position(p.ticket, rev.get(p.symbol, p.symbol), 1 if p.type == 0 else -1, p.volume,
                                 p.price_open, p.sl, p.tp, p.profit, int(p.time - self.offset_sec), p.comment))
         return out
+
+    def foreign_positions(self) -> list[dict]:
+        rev = {v: k for k, v in self.cfg.get("symbol_map", default={}).items()}
+        return [{"symbol": rev.get(p.symbol, p.symbol), "direction": 1 if p.type == 0 else -1, "volume": p.volume}
+                for p in (self.mt5.positions_get() or []) if p.magic != MAGIC]
 
     def pending_orders(self) -> list[dict]:
         return [{"ticket": o.ticket, "symbol": o.symbol, "comment": o.comment, "price": o.price_open}

@@ -254,6 +254,7 @@ private fun FieldEditor(f: Field, values: MutableMap<String, String>) {
 // ---------- MT5 ----------
 @Composable
 fun Mt5Screen(vm: AppVM, go: (String) -> Unit) {
+    var shared by remember { mutableStateOf(true) }
     var login by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     var server by remember { mutableStateOf("LiteFinance-MT5-Demo") }
@@ -262,19 +263,35 @@ fun Mt5Screen(vm: AppVM, go: (String) -> Unit) {
         item { SubHeader("حساب متاتریدر", go) }
         item {
             Section("") {
-                Body("رمز فقط یک‌بار به سرور فرستاده و آنجا رمزنگاری‌شده ذخیره می‌شود؛ روی گوشی ذخیره نمی‌شود و از سرور هم برگردانده نمی‌شود.")
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(login, { login = it.filter(Char::isDigit) }, label = { Text("شماره حساب (Login)") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(pass, { pass = it }, label = { Text("رمز معامله") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(server, { server = it }, label = { Text("نام سرور بروکر") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(path, { path = it }, label = { Text("مسیر terminal64.exe (خالی = پیش‌فرض)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                Muted("مسیر پیش‌فرض C:\\NeuroTraderPro\\MT5 است — یک نصب جدا از متاتریدرِ برنامه‌ی دیگر روی سرور، تا حساب آن عوض نشود.")
-                Spacer(Modifier.height(8.dp))
-                BusyButton("ارسال امن به سرور", vm.busy, login.isNotBlank() && pass.isNotBlank() && server.isNotBlank()) {
-                    vm.sendMt5(login, pass, server, path); pass = ""
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("استفاده از همان متاتریدرِ باز روی سرور", color = C.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Switch(checked = shared, onCheckedChange = { shared = it })
+                }
+                Spacer(Modifier.height(6.dp))
+                if (shared) {
+                    Body("موتور به همان ترمینالی وصل می‌شود که برنامه‌ی دیگر استفاده می‌کند؛ رمز لازم نیست و حساب ترمینال عوض نمی‌شود. " +
+                            "فقط با شناسه‌ی خودش (Magic 31102026) معامله می‌کند و به پوزیشن‌های برنامه‌ی دیگر دست نمی‌زند.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(login, { login = it.filter(Char::isDigit) }, label = { Text("شماره حساب برای کنترل (اختیاری)") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                    Muted("اگر وارد کنید و ترمینال به حساب دیگری وصل باشد، موتور معامله نمی‌کند.")
+                    OutlinedTextField(path, { path = it }, label = { Text("مسیر terminal64.exe (خالی = ترمینال باز)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    BusyButton("ذخیره", vm.busy) { vm.sendMt5(login, "", "", path, true) }
+                } else {
+                    Body("ترمینال جداگانه با ورود به حساب خودش. رمز فقط یک‌بار به سرور فرستاده و آنجا رمزنگاری‌شده ذخیره می‌شود؛ روی گوشی ذخیره نمی‌شود.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(login, { login = it.filter(Char::isDigit) }, label = { Text("شماره حساب (Login)") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(pass, { pass = it }, label = { Text("رمز معامله") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(server, { server = it }, label = { Text("نام سرور بروکر") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(path, { path = it }, label = { Text("مسیر terminal64.exe جداگانه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Muted("هرگز مسیر ترمینالِ برنامه‌ی دیگر را اینجا نگذارید؛ ورود با حساب دیگر، حساب آن را عوض می‌کند.")
+                    Spacer(Modifier.height(8.dp))
+                    BusyButton("ارسال امن به سرور", vm.busy, login.isNotBlank() && pass.isNotBlank() && server.isNotBlank() && path.isNotBlank()) {
+                        vm.sendMt5(login, pass, server, path, false); pass = ""
+                    }
                 }
             }
         }

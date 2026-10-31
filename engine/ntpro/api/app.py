@@ -49,10 +49,11 @@ class KillIn(BaseModel):
 
 
 class MT5In(BaseModel):
-    login: int
-    password: str
-    server: str
+    login: int = 0
+    password: str = ""
+    server: str = ""
     path: str = ""
+    shared: bool = True          # استفاده از همان متاتریدرِ باز روی سرور (بدون رمز)
 
 
 class ConfigIn(BaseModel):
@@ -244,10 +245,13 @@ def create_app(engine) -> FastAPI:
 
     @app.post("/api/mt5/credentials")
     def mt5_credentials(body: MT5In, request: Request, u: str = Depends(user)):
-        engine.vault.store_secret("mt5", body.password)        # رمزنگاری‌شده روی سرور؛ هیچ‌وقت برگردانده نمی‌شود
-        patch = {"mt5": {"login": body.login, "server": body.server}}
-        if body.path:
-            patch["mt5"]["path"] = body.path
+        if not body.shared and not body.password:
+            raise HTTPException(400, "برای ترمینال جداگانه رمز لازم است")
+        if body.password:
+            engine.vault.store_secret("mt5", body.password)    # رمزنگاری‌شده روی سرور؛ هیچ‌وقت برگردانده نمی‌شود
+        patch = {"mt5": {"login": body.login, "shared_terminal": body.shared, "path": body.path}}
+        if body.server:
+            patch["mt5"]["server"] = body.server
         cfg.update(patch, user=u, reason="به‌روزرسانی حساب MT5")
         try:
             engine.broker.shutdown()
