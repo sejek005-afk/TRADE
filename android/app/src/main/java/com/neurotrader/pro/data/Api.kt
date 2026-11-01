@@ -91,19 +91,10 @@ class Api(private val store: Store) {
     // ---------- احراز هویت ----------
     suspend fun ping(): JSONObject = call("GET", "/api/ping", auth = false) as JSONObject
 
-    suspend fun setup(code: String, user: String, pass: String): JSONObject =
-        call("POST", "/api/auth/setup", JSONObject().put("setup_code", code).put("username", user).put("password", pass), false) as JSONObject
-
-    suspend fun confirm(user: String, code: String) {
-        val r = call("POST", "/api/auth/setup/confirm", JSONObject().put("username", user).put("code", code), false) as JSONObject
+    suspend fun pair(code: String) {
+        val r = call("POST", "/api/auth/pair", JSONObject().put("code", code.trim().uppercase()), false) as JSONObject
         saveTokens(r)
-        store.username = user
-    }
-
-    suspend fun login(user: String, pass: String, code: String) {
-        val r = call("POST", "/api/auth/login", JSONObject().put("username", user).put("password", pass).put("code", code), false) as JSONObject
-        saveTokens(r)
-        store.username = user
+        store.username = "admin"
     }
 
     fun websocket(listener: WebSocketListener, logAfter: Long): WebSocket {

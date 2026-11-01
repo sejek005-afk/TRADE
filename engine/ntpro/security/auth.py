@@ -13,6 +13,7 @@ import time
 from collections import defaultdict, deque
 
 PBKDF2_ITER = 240_000
+DEVICE_DAYS = 3650          # گوشیِ جفت‌شده تا ۱۰ سال بدون ورود دوباره وصل می‌ماند
 
 
 # ---------- رمز ----------
@@ -168,29 +169,49 @@ class Auth:
         self.db.kv_set("setup_code", "")
         return True
 
+    def pair(self, setup_code: str) -> dict:
+        """جفت کردن گوشی فقط با کد اتصال (بدون رمز و بدون Google Authenticator).
+        گوشی یک توکن بلندمدت می‌گیرد و از آن به بعد مستقیم وارد می‌شود."""
+        stored = str(self.db.kv_get("setup_code", "") or "")
+        if not stored or not hmac.compare_digest(stored, (setup_code or "").strip().upper()):
+            raise PermissionError("کد اتصال اشتباه است")
+        u = self.db.one("SELECT username FROM users WHERE totp_confirmed=1 ORDER BY created LIMIT 1")
+        username = u["username"] if u else "admin"
+        if not u:
+            self.db.execute("INSERT OR REPLACE INTO users(username,pw_hash,totp_secret,totp_confirmed,created) VALUES(?,?,?,?,?)",
+                            (username, "", "", 1, int(time.time())))
+        return self.issue(username, device=True)
+
     def login(self, username: str, password: str, code: str) -> dict | None:
         u = self.db.one("SELECT * FROM users WHERE username=? AND totp_confirmed=1", (username,))
         if not u or not verify_password(password, u["pw_hash"]) or not verify_totp(u["totp_secret"], code):
             return None
         return self.issue(username)
 
-    def issue(self, username: str) -> dict:
-        a = self.cfg.get("api")
+    def _access(self, username: str) -> dict:
+        minutes = int(self.cfg.get("api")["access_token_minutes"])
+        tok = jwt_encode({"sub": username, "typ": "access", "exp": int(time.time()) + minutes * 60}, self.key)
+        return {"access_token": tok, "expires_in": minutes * 60}
+
+    def issue(self, username: str, device: bool = False) -> dict:
         now = int(time.time())
         jti = secrets.token_hex(16)
-        refresh_exp = now + int(a["refresh_token_days"]) * 86400
+        days = DEVICE_DAYS if device else int(self.cfg.get("api")["refresh_token_days"])
+        refresh_exp = now + days * 86400
         self.db.execute("INSERT INTO refresh_tokens(jti,username,expires) VALUES(?,?,?)", (jti, username, refresh_exp))
-        return {
-            "access_token": jwt_encode({"sub": username, "typ": "access", "exp": now + int(a["access_token_minutes"]) * 60}, self.key),
-            "refresh_token": jwt_encode({"sub": username, "typ": "refresh", "jti": jti, "exp": refresh_exp}, self.key),
-            "expires_in": int(a["access_token_minutes"]) * 60,
-        }
+        payload = {"sub": username, "typ": "refresh", "jti": jti, "exp": refresh_exp}
+        if device:
+            payload["dev"] = 1
+        return {**self._access(username), "refresh_token": jwt_encode(payload, self.key)}
 
     def refresh(self, token: str) -> dict | None:
         p = jwt_decode(token, self.key)
         if not p or p.get("typ") != "refresh":
             return None
         row = self.db.one("SELECT * FROM refresh_tokens WHERE jti=? AND revoked=0", (p["jti"],))
+        if p.get("dev"):
+            # توکن گوشیِ جفت‌شده عوض نمی‌شود تا قطعی اینترنت هیچ‌وقت باعث بیرون افتادن نشود
+            return {**self._access(p["sub"]), "refresh_token": token} if row else None
         if not row:
             # استفاده‌ی دوباره از توکن باطل‌شده = احتمال سرقت → همه باطل
             self.db.execute("UPDATE refresh_tokens SET revoked=1 WHERE username=?", (p["sub"],))

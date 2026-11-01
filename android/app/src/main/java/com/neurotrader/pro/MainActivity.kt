@@ -27,10 +27,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.neurotrader.pro.ui.C
 import com.neurotrader.pro.ui.ConnectScreen
-import com.neurotrader.pro.ui.LoginScreen
 import com.neurotrader.pro.ui.MainScreen
 import com.neurotrader.pro.ui.NTColors
-import com.neurotrader.pro.ui.SetupScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -65,15 +63,11 @@ class MainActivity : ComponentActivity() {
                     }
                     Box(Modifier.fillMaxSize().background(C.bg).systemBarsPadding()) {
                         when (vm.screen) {
-                            Screen.Connect, Screen.Setup, Screen.Login -> Scaffold(
+                            Screen.Connect -> Scaffold(
                                 containerColor = C.bg, snackbarHost = { SnackbarHost(snackbar) }
                             ) { pad ->
                                 Box(Modifier.fillMaxSize().background(C.bg).padding(pad)) {
-                                    when (vm.screen) {
-                                        Screen.Connect -> ConnectScreen(vm)
-                                        Screen.Setup -> SetupScreen(vm)
-                                        else -> LoginScreen(vm)
-                                    }
+                                    ConnectScreen(vm)
                                 }
                             }
                             Screen.Main -> MainScreen(vm, snackbar)

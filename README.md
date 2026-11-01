@@ -107,7 +107,7 @@ android/             اپ Kotlin + Jetpack Compose (RTL فارسی)
    ```
 5. ورود خودکار ویندوز را فعال کنید (`netplwiz`) تا بعد از ری‌استارت VPS، موتور و MT5 خودکار بالا بیایند.
 6. در `C:\NeuroTraderPro\engine\data`:
-   - `SETUP_CODE.txt` — کد راه‌اندازی اولین ورود از اپ
+   - `SETUP_CODE.txt` — کد اتصال گوشی (فقط یک بار در اپ وارد می‌شود)
    - `FINGERPRINT.txt` — اثر انگشت گواهی HTTPS (در اپ با این مقایسه کنید)
    - `logs\engine.log` — لاگ کامل
 7. در پنل ParsPack (اگر فایروال ابری دارد) پورت **8810/TCP** را باز کنید.
@@ -116,6 +116,8 @@ android/             اپ Kotlin + Jetpack Compose (RTL فارسی)
 - اجرای دستی برای تست: `scripts\start_console.bat`
 - توقف فقط همین موتور: `scripts\stop.ps1`
 - حذف تسک: `scripts\uninstall_service.ps1`
+- ری‌استارت فقط همین موتور (برای خواندن تنظیمات/کد جدید): دابل‌کلیک `scripts\restart_engine.bat`
+- بک‌تست با دابل‌کلیک: `scripts\run_backtest.bat` → نتیجه در `data\logs\backtest_result.txt`
 - بک‌تست: `.venv\Scripts\python scripts\backtest.py --symbol XAUUSD --days 90 --per-strategy` (با `--ticks` برای داده‌ی تیک)
 
 ---
@@ -124,8 +126,9 @@ android/             اپ Kotlin + Jetpack Compose (RTL فارسی)
 
 APK از بخش **Releases** (`NeuroTraderPro-v1.0.N.apk`) — هر تغییر در پوشه‌ی `android` خودکار در GitHub Actions ساخته می‌شود.
 
-1. آدرس `IP-سرور:8810` را وارد کنید → اثر انگشت گواهی را با `FINGERPRINT.txt` مقایسه و تأیید کنید.
-2. کد `SETUP_CODE.txt`، نام کاربری و رمز (حداقل ۱۰ کاراکتر) → کلید ۲FA را در Google Authenticator اضافه کنید → کد ۶ رقمی.
+1. آدرس `IP-سرور:8810` و کد اتصال (`SETUP_CODE.txt`) را وارد کنید → «اتصال». رمز و Google Authenticator لازم نیست.
+2. از آن به بعد اپ مستقیم باز می‌شود (توکن گوشی ۱۰ ساله است و با قطعی اینترنت باطل نمی‌شود).
+   گواهی سرور بار اول ثبت می‌شود و اپ فقط به همان سرور وصل می‌شود. «خروج از همه‌ی دستگاه‌ها» همه‌ی گوشی‌ها را قطع می‌کند.
 3. **بیشتر ← حساب متاتریدر**: شماره حساب، رمز و سرور (`LiteFinance-MT5-Demo` یا نام دقیق سرور دمو). رمز فقط یک‌بار
    فرستاده و روی سرور رمزنگاری‌شده ذخیره می‌شود؛ روی گوشی ذخیره نمی‌شود.
 4. داشبورد ← روشن کردن ربات.

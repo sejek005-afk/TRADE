@@ -23,7 +23,7 @@ import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class Screen { Connect, Setup, Login, Main }
+enum class Screen { Connect, Main }
 
 class AppVM(app: Application) : AndroidViewModel(app) {
     val store = Store(app)
@@ -32,9 +32,6 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     var screen by mutableStateOf(Screen.Connect)
     var busy by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
-    var pendingFingerprint by mutableStateOf<String?>(null)
-    var totpSecret by mutableStateOf<JSONObject?>(null)
-    var setupUser by mutableStateOf("")
 
     var state by mutableStateOf<JSONObject?>(null)
     var wsConnected by mutableStateOf(false)
@@ -51,19 +48,9 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun boot() {
-        if (store.server.isEmpty() || store.pin.isEmpty()) {
-            screen = Screen.Connect; return
-        }
-        if (store.refreshToken.isNotEmpty() && api.refresh()) {
-            enterMain(); return
-        }
-        try {
-            val p = api.ping()
-            screen = if (p.optBoolean("setup_required")) Screen.Setup else Screen.Login
-        } catch (e: Exception) {
-            screen = Screen.Login
-            message = e.message
-        }
+        // گوشیِ جفت‌شده مستقیم وارد می‌شود؛ حتی اگر الان اینترنت نباشد، اتصال زنده خودش دوباره تلاش می‌کند
+        if (store.server.isNotEmpty() && store.pin.isNotEmpty() && store.refreshToken.isNotEmpty()) enterMain()
+        else screen = Screen.Connect
     }
 
     private fun launchBusy(block: suspend () -> Unit) = viewModelScope.launch {
@@ -79,22 +66,20 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---------- اتصال و ورود ----------
-    fun connect(address: String) = launchBusy {
+    // ---------- اتصال (یک بار، بدون رمز) ----------
+    fun connect(address: String, code: String) = launchBusy {
         var url = address.trim().trimEnd('/')
         if (!url.startsWith("https://")) url = "https://" + url.removePrefix("http://")
         if (!Regex(":\\d+$").containsMatchIn(url.substringAfter("://"))) url += ":8810"
-        store.server = url
-        val fp = withContext(Dispatchers.IO) { Net.fetchFingerprint(url) }.getOrThrow()
-        pendingFingerprint = fp
-    }
-
-    fun acceptFingerprint() = launchBusy {
-        store.pin = pendingFingerprint ?: return@launchBusy
-        pendingFingerprint = null
-        api.rebuild()
-        val p = api.ping()
-        screen = if (p.optBoolean("setup_required")) Screen.Setup else Screen.Login
+        if (url != store.server || store.pin.isEmpty()) {
+            // بار اول گواهی سرور ثبت می‌شود و از آن به بعد فقط به همین سرور اعتماد می‌شود
+            val fp = withContext(Dispatchers.IO) { Net.fetchFingerprint(url) }.getOrThrow()
+            store.server = url
+            store.pin = fp
+            api.rebuild()
+        }
+        api.pair(code)
+        enterMain()
     }
 
     fun resetServer() {
@@ -105,27 +90,11 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         screen = Screen.Connect
     }
 
-    fun setup(code: String, user: String, pass: String) = launchBusy {
-        totpSecret = api.setup(code, user, pass)
-        setupUser = user
-    }
-
-    fun confirmSetup(code: String) = launchBusy {
-        api.confirm(setupUser, code)
-        totpSecret = null
-        enterMain()
-    }
-
-    fun login(user: String, pass: String, code: String) = launchBusy {
-        api.login(user, pass, code)
-        enterMain()
-    }
-
     fun logout(all: Boolean) = launchBusy {
         if (all) runCatching { api.post("/api/auth/logout_all") }
         stopLive()
         store.clearSession()
-        screen = Screen.Login
+        screen = Screen.Connect
     }
 
     private suspend fun enterMain() {
@@ -146,7 +115,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             state = api.obj("/api/state")
             lastUpdate = System.currentTimeMillis()
         } catch (e: ApiException) {
-            if (e.code == 401) screen = Screen.Login else message = e.message
+            if (e.code == 401) {
+                stopLive(); store.clearSession(); screen = Screen.Connect
+                message = "اتصال گوشی باطل شده؛ کد اتصال را دوباره وارد کنید"
+            } else message = e.message
         }
     }
 

@@ -24,6 +24,10 @@ class SetupIn(BaseModel):
     password: str
 
 
+class PairIn(BaseModel):
+    code: str
+
+
 class ConfirmIn(BaseModel):
     username: str
     code: str
@@ -119,6 +123,20 @@ def create_app(engine) -> FastAPI:
             raise HTTPException(400, str(e))
         db.audit(body.username, ip, "setup", "ok")
         return out
+
+    @app.post("/api/auth/pair")
+    def pair(body: PairIn, request: Request):
+        ip = _client_ip(request)
+        if limiter.is_locked(ip):
+            raise HTTPException(429, "به دلیل تلاش‌های ناموفق، ۱۵ دقیقه قفل است")
+        try:
+            tok = auth.pair(body.code)
+        except PermissionError as e:
+            limiter.fail(ip)
+            db.audit("-", ip, "pair", "fail")
+            raise HTTPException(400, str(e))
+        db.audit("admin", ip, "pair", "ok")
+        return tok
 
     @app.post("/api/auth/setup/confirm")
     def setup_confirm(body: ConfirmIn, request: Request):

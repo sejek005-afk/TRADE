@@ -58,9 +58,7 @@ def main(argv=None) -> int:
     import uvicorn
     from .api.app import create_app
     app = create_app(eng)
-    code = None
-    if not app.state.auth.has_users():
-        code = app.state.auth.setup_code(data)
+    code = app.state.auth.setup_code(data)          # کد اتصال گوشی (بدون رمز)
     ssl = {}
     fp = ""
     if eng.cfg.get("api", "tls"):
@@ -72,7 +70,7 @@ def main(argv=None) -> int:
         f" NeuroTrader Pro {__version__}  |  magic {MAGIC}  |  mode {eng.cfg.get('mode')}",
         f" API: {'https' if ssl else 'http'}://<IP-سرور>:{port}",
         f" اثر انگشت گواهی (در اپ تأیید کنید): {fp}" if fp else "",
-        f" کد راه‌اندازی (فقط بار اول): {code}" if code else "",
+        f" کد اتصال گوشی: {code}" if code else "",
         "=" * 64,
     ]
     for line in banner:

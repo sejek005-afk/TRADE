@@ -89,3 +89,25 @@ def test_config_guards(tmp_path):
         c.update({"mode": "live"})
     with pytest.raises(ValueError):
         c.update({"risk": {"risk_per_trade_pct": 5}})
+
+
+def test_device_pairing(tmp_path):
+    db = DB(tmp_path / "t.db")
+    a = Auth(db, b"k" * 32, Config(tmp_path / "c.json"))
+    code = a.setup_code(tmp_path)
+    try:
+        a.pair("WRONG")
+        assert False
+    except PermissionError:
+        pass
+    tok = a.pair(code.lower())
+    assert a.has_users() and a.verify_access(tok["access_token"]) == "admin"
+    assert jwt_decode(tok["refresh_token"], b"k" * 32)["exp"] > time.time() + 3000 * 86400
+    # توکن گوشی عوض نمی‌شود و چند بار پشت سر هم قابل استفاده است
+    for _ in range(3):
+        r = a.refresh(tok["refresh_token"])
+        assert r and r["refresh_token"] == tok["refresh_token"] and a.verify_access(r["access_token"]) == "admin"
+    assert a.login("admin", "", "") is None                       # ورود با رمز خالی ممکن نیست
+    assert a.pair(code)                                           # گوشی دوم / نصب دوباره با همان کد
+    a.revoke_all("admin")
+    assert a.refresh(tok["refresh_token"]) is None
